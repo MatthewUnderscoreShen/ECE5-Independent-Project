@@ -31,7 +31,7 @@ void setup() {
   int i;
   int j;
     
-  R_var = rand();
+  int R_var = rand();
   
   if (R_var == 1) {
     for (i = 0;i < 4;i++) {
