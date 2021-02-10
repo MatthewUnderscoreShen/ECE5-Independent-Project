@@ -1,3 +1,4 @@
+
 int T[4][2] = {{0,0},{1,0},{1,1},{1,0}};
 int L[4][2] = {{0,0},{1,0},{1,0},{1,1}};
 int J[4][2] = {{0,0},{1,1},{1,0},{1,0}};
@@ -51,12 +52,17 @@ void SevenSided(int R_var) {
   }
 }
 
-
+int R_var = rand();
 
 void loop() 
 { 
- 
-  int R_var = rand();
+  int Remainder = R_var%8;
+  
   SevenSided(R_var);
-
+  R_var = rand();
+  
+  int New_Remainder = R_var%8;
+  if (New_Remainder==Remainder) {
+    R_var = rand();
+  }
 }
