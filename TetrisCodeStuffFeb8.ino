@@ -31,9 +31,9 @@ void setup() {
   int i;
   int j;
     
-  rand();
+  R_var = rand();
   
-  if (rand()%8 == 1) {
+  if (R_var == 1) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(T.matrix[i][j]); //T shape will be assigned 1
@@ -41,7 +41,7 @@ void setup() {
       Serial.println('\t'); 
     } 
   }
-  else if (rand()%8 == 2) {
+  else if (R_var == 2) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(L.matrix[i][j]); //L shape will be assigned 2
@@ -49,7 +49,7 @@ void setup() {
     Serial.println('\t');
     } 
   }
-  else if (rand()%8 == 3) {
+  else if (R_var == 3) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(J.matrix[i][j]); //J shape will be assigned 3
@@ -57,7 +57,7 @@ void setup() {
     Serial.println('\t');
     } 
   }
-  else if (rand()%8 == 4) {
+  else if (R_var == 4) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(O.matrix[i][j]); //O shape will be assigned 4
@@ -65,7 +65,7 @@ void setup() {
     Serial.println('\t');
     } 
   }
-  else if (rand()%8 == 5) {
+  else if (R_var == 5) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(I.matrix[i][j]); //I shape will be assigned 5
@@ -73,7 +73,7 @@ void setup() {
     Serial.println('\t');
     } 
   }
-  else if (rand()%8 == 6) {
+  else if (R_var == 6) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(Z.matrix[i][j]); //Z shape will be assigned 6
@@ -81,7 +81,7 @@ void setup() {
     Serial.println('\t');
     } 
   }
-  else if (rand()%8 == 7) {
+  else if (R_var == 7) {
     for (i = 0;i < 4;i++) {
       for (j = 0;j < 2;j++) {
         Serial.println(S.matrix[i][j]); //S shape will be assigned 7
