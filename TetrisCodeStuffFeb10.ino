@@ -1,4 +1,3 @@
-
 int T[4][2] = {{0,0},{1,0},{1,1},{1,0}};
 int L[4][2] = {{0,0},{1,0},{1,0},{1,1}};
 int J[4][2] = {{0,0},{1,1},{1,0},{1,0}};
@@ -27,11 +26,8 @@ void matrixPrinter(int matrix[4][2]) {
 }
 
 
-void loop() 
-{ 
-    
-  int R_var = rand();
-  
+void SevenSided(int R_var) {
+
   if (R_var%8 == 1) {
     matrixPrinter(T);
   }
@@ -53,4 +49,14 @@ void loop()
   else if (R_var%8 == 7) {
     matrixPrinter(S); 
   }
+}
+
+
+
+void loop() 
+{ 
+ 
+  int R_var = rand();
+  SevenSided(R_var);
+
 }
