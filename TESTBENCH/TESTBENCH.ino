@@ -4,30 +4,60 @@
 #define buttonA 12
 #define buttonB 13
 
-struct piece {
-  int x, y;
-  int ori[4][2];
-  int rot[2][2];
-};
+
+
+
 
 double x, y;
 int a, b;
+bool gameState = false;
+
 int board[20][10];
-int pieces[][4][2] = 
-  { { {0, 0}, { -1, 0}, {1, 0},   {2, 0} }, //I piece
-    { {0, 0}, {1, 0},   {0, 1},   {1, 1} }, //O piece
-    { {0, 0}, { -1, 0}, {0, 1},   {1, 0} }, //T piece
-    { {0, 0}, { -1, 1}, { -1, 0}, {1, 0} }, //J piece
-    { {0, 0}, { -1, 0}, {1, 0},   {1, 1} }, //L piece
-    { {0, 0}, { -1, 0}, {0, 1},   {1, 1} }, //S piece
-    { {0, 0}, { -1, 1}, {0, 1},   {1, 0} }  //Z piece
-  };
-/*
+
 int rots[][2][2] = 
-  { { {0, 1},  {-1, 0} }, //90deg ccw around origin
-    { {0, -1}, {1, 0}  }, //90deg cw around origin
-    { 
-*/
+  { 
+    { {0, 1},  {-1, 0} }, //90deg cw around origin
+    { {0, -1}, {1, 0}  }  //90deg ccw around origin
+  };
+  
+struct piece {
+  int xOff; //offsets define what to add to the matrix
+  int yOff; //to shift it to the board
+  int xStart; //starting point of piece center
+  int yStart;
+  int ori[2][4];
+};
+typedef struct piece Piece;
+
+Piece IPiece = (Piece){-0.5, 0.5, 4, 20, {
+                          {-1.5, -0.5, 0.5, 1.5},
+                          { 0.5,  0.5, 0.5, 0.5}
+                      }};
+Piece OPiece = (Piece){0.5, 0.5 , 4, 19, { 
+                          {0, 1, 0, 1},
+                          {0, 0, 1, 1} 
+                      }};
+Piece TPiece = (Piece){0, 0, 4, 19, {
+                          {0, -1, 0, 1},
+                          {0,  0, 1, 0}
+                      }};
+Piece JPiece = (Piece){0, 0, 4, 19, {
+                          {0, -1, -1, 1},
+                          {0,  1,  0, 0}
+                      }};
+Piece LPiece = (Piece){0, 0, 4, 19, {
+                          {0, -1, 1, 1},
+                          {0,  0, 0, 1}
+                      }};
+Piece SPiece = (Piece){0, 0, 4, 19, {
+                          {0, -1, 0, 1},
+                          {0,  0, 1, 1}
+                      }};
+Piece SPiece = (Piece){0, 0, 4, 19, {
+                          {0, -1, 0, 1},
+                          {0,  1, 1, 0}
+                      }};
+
   void setup() {
     // put your setup code here, to run once:
     Serial.begin(9600);
