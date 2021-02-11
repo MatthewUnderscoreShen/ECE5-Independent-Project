@@ -11,12 +11,13 @@ int pieceNum = 0; //piece number
 bool gameState = false;
 bool activePiece = false;
 
-int board[20][10];
+int board[40][20];
 
 struct piece {
-  int xOff; //offsets define what to add to the matrix
+   xOff; //offsets define what to add to the matrix
   int yOff; //to shift it to the board
   int x; //location
+  int y;
   int ori[2][4];
 };
 typedef struct piece Piece;
@@ -24,33 +25,33 @@ typedef struct piece Piece;
 //Initializing pieces.
 // 0:I  1:O  2:T  3:J  4:L  5:S  6:Z
 Piece pieces[] = {
-      (Piece){-0.5, 0.5, 4, 20, {
-                {-1.5, -0.5, 0.5, 1.5},
-                { 0.5,  0.5, 0.5, 0.5}
+      (Piece){-1, 1, 8, 40, {
+                {-3, -1, 1, 3}, //x
+                { 1,  1, 1, 1}  //y
              }}, //I piece
-      (Piece){0.5, 0.5 , 4, 19, { 
-                {-0.5, -0.5,  0.5, 0.5},
-                {-0.5,  0.5, -0.5, 0.5} 
+      (Piece){1, 1 , 8, 38, { 
+                {-1, -1,  1, 1},
+                {-1,  1, -1, 1} 
              }}, //O piece
-      (Piece){0, 0, 4, 19, {
-                {0, -1, 0, 1},
-                {0,  0, 1, 0}
+      (Piece){0, 0, 8, 38, {
+                {0, -2, 0, 2},
+                {0,  0, 2, 0}
              }}, //T piece
-      (Piece){0, 0, 4, 19, {
-                {0, -1, -1, 1},
-                {0,  1,  0, 0}
+      (Piece){0, 0, 8, 38, {
+                {0, -2, -2, 2},
+                {0,  2,  0, 0}
              }}, //J piece
-      (Piece){0, 0, 4, 19, {
-                {0, -1, 1, 1},
-                {0,  0, 0, 1}
+      (Piece){0, 0, 8, 38, {
+                {0, -2, 2, 2},
+                {0,  0, 0, 2}
              }}, //L piece
-      (Piece){0, 0, 4, 19, {
-                {0, -1, 0, 1},
-                {0,  0, 1, 1}
+      (Piece){0, -1, 8, 38, {
+                {-2,    0,   0,   2},
+                {-0.5, -0.5, 0.5, 0.5}
              }}, //S piece
-      (Piece){0, 0, 4, 19, {
-                {0, -1, 0, 1},
-                {0,  1, 1, 0}
+      (Piece){0, -1, 8, 38, {
+                {-2,   0,    0,    2},
+                { 0.5, 0.5, -0.5, -0.5}
              }}  //Z piece
   };
 
@@ -69,7 +70,7 @@ int rots[][2][2] =
     pinMode(buttonA, INPUT);
     pinMode(buttonB, INPUT);
     for (int i = 0; i < 200; i++) { //
-      board[i / 10][i % 10] = 0;
+      board[i / 20][i % 20] = 0;
     }
   }
 
