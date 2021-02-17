@@ -26,10 +26,10 @@ void CollisionCheck(int CurrentRow, int CurrentCol){
   for (i = 0; i < 2; i++) {
     for (j = 0; j < 4; j++) {
       if (Background[CurrentRow + i][CurrentCol + j] == EmptySpace[i][j]) {
-        return; //put some stuff in here to move the TetrisPiece down one i somehow, implement millis function
+        CurrentRow = CurrentRow + 1; //put some stuff in here to move the TetrisPiece down one i somehow, implement millis function
       }
       else if (Background[CurrentRow + i][CurrentCol + j] != EmptySpace[i][j]) {
-        Piece_to_background(TetrisPiece, i - 1, j); //places the tetris piece in the background matrix
+        Piece_to_background(TetrisPiece, CurrentRow - 1, CurrentCol); //places the tetris piece in the background matrix
                                                     //one row above where there is no more space in the background
       }
     }
