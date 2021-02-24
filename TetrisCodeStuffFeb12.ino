@@ -52,19 +52,25 @@ void SevenSided(int R_var) {
   }
 }
 
-int R_var = random(1,8);
+int RandomVar = random(1,8);
+
+void PieceRandomizer(int R_var) {
+
+  int Old_RandomVar = RandomVar;
+  
+  SevenSided(RandomVar);
+  RandomVar = random(1,8);
+  
+  int New_RandomVar = RandomVar;
+  if (New_RandomVar==Old_RandomVar) {
+    RandomVar = random(1,8);
+  }
+  
+}
 
 void loop() 
 { 
-  int Old_R_var = R_var;
-  
-  SevenSided(R_var);
-  R_var = random(1,8);
-  
-  int New_R_var = R_var;
-  if (New_R_var==Old_R_var) {
-    R_var = rand();
-  }
+  PieceRandomizer(RandomVar);
   
   delay(2000);
   Serial.print('\n');
