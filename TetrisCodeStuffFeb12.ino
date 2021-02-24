@@ -1,4 +1,6 @@
 
+int Background[40][20];
+
 int T[2][4] = {{0,0,1,0},{0,1,1,1}};
 int L[2][4] = {{0,0,0,1},{0,1,1,1}};
 int J[2][4] = {{0,1,1,1},{0,0,0,1}};
@@ -13,16 +15,15 @@ void setup() {
 }
 
 
-void matrixPrinter(int matrix[2][4]) {
-
+void PiecePlacer(int matrix[2][4]) {
+  //places the new piece at the top of the screen
   int i;
   int j;
 
   for (i = 0;i < 2;i++) {
       for (j = 0;j < 4;j++) {
-        Serial.print(matrix[i][j]); 
+        Background[i][8 + j] = matrix[2][4]; 
       }
-      Serial.print('\n');
   }
 }
 
@@ -30,25 +31,25 @@ void matrixPrinter(int matrix[2][4]) {
 void SevenSided(int R_var) {
 
   if (R_var == 1) {
-    matrixPrinter(T);
+    PiecePlacer(T);
   }
   else if (R_var == 2) {
-    matrixPrinter(L);
+    PiecePlacer(L);
   }
   else if (R_var == 3) {
-    matrixPrinter(J);
+    PiecePlacer(J);
   }
   else if (R_var == 4) {
-    matrixPrinter(O);
+    PiecePlacer(O);
   }
   else if (R_var == 5) {
-    matrixPrinter(I);
+    PiecePlacer(I);
   }
   else if (R_var == 6) {
-    matrixPrinter(Z);
+    PiecePlacer(Z);
   }
   else if (R_var == 7) {
-    matrixPrinter(S); 
+    PiecePlacer(S); 
   }
 }
 
