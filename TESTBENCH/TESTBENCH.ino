@@ -29,7 +29,7 @@ typedef struct piece Piece;
 //Initializing pieces.
 // 0:I  1:O  2:T  3:J  4:L  5:S  6:Z
 Piece pieces[] = {
-      (Piece){-1, 1, 8, 0, {
+      (Piece){-1, 1, 10, 0, {
                 {-3, -1, 1, 3}, //x
                 { 1,  1, 1, 1}  //y
              }}, //I piece
@@ -63,13 +63,14 @@ Piece currentPiece;
 
 int rots[][2][2] = 
   { //Rotation matricies
-    { {0, -1},  {1, 0} }, //90deg ccw around origin
+    { {1,  0}, { 0, 1} }, //0 deg 
+    { {0, -1}, { 1, 0} }, //90deg ccw around origin
     { {0,  1}, {-1, 0} }  //90deg cw around origin
   };
 
   void setPiece() { //this function chooses and sets the piece
     if (activePiece) { return; }
-    pieceNum = 1;
+    pieceNum = 0;
     currentPiece.xOff = pieces[pieceNum].xOff;
     currentPiece.yOff = pieces[pieceNum].yOff;
     currentPiece.xPos = pieces[pieceNum].xPos;
@@ -87,9 +88,11 @@ int rots[][2][2] =
     activePiece = true;
   }
 
-  void movePiece(int currentT, bool isOut) {
-    if ((currentT / refresh % fallSpeed == 0) && !isOut) { //Fall
-      currentPiece.yPos = currentPiece.yPos + 2;
+  void movePiece(int currentT, int dx, int dy, int dRot[][2]) {
+    if ((currentT / refresh % fallSpeed == 0) && !boundsCheck(dx, dy, dRot)) { //Fall
+      currentPiece.xPos = currentPiece.xPos + dx;
+      currentPiece.yPos = currentPiece.yPos + dy + 2;
+      matrixMult(dRot, currentPiece.ori, currentPiece.ori);
     }
   }
 
@@ -125,13 +128,25 @@ int rots[][2][2] =
     Serial.println("------------------------------");
   }
 
-  boolean boundsCheck(int dx, int dy/*, int[][] dRot*/) { //returns true if proposed transformation puts piece out of bounds
+  //Matrix A, Matrix B, the matrix to copy to
+  void matrixMult(int A[][2], int B[][4], int C[][4]) { //2x2 matrix times 2x4 matrix
+    int M[2][4];
+    for (int i = 0; i < 8; i++) {
+      M[i/4][i%4] = A[i/4][0]*B[0][i%4] + A[i/4][1]*B[1][i%4];
+    }
+    for (int i = 0; i < 8; i++) {
+      C[i/4][i%4] = M[i/4][i%4];
+    }
+  }
+
+  boolean boundsCheck(int dx, int dy, int dRot[][2]) { //returns true if proposed transformation puts piece out of bounds
     int xNew;
     int yNew;
-    //int[][] oriNew = matrixMult(dRot, currentPiece.ori);
+    int oriNew[2][4];
+    matrixMult(dRot, currentPiece.ori, oriNew);
     for (int i = 0; i < 4; i++) {
-      xNew = currentPiece.xPos + dx + currentPiece.xOff + currentPiece.ori[0][i]; //oriNew[0][i];
-      yNew = currentPiece.yPos + dy + currentPiece.yOff + currentPiece.ori[1][i]; //oriNew[1][i];
+      xNew = currentPiece.xPos + dx + currentPiece.xOff + oriNew[0][i];
+      yNew = currentPiece.yPos + dy + currentPiece.yOff + oriNew[1][i];
       if (xNew < 0 || xNew > 40) {
         return true;
       }
@@ -141,15 +156,6 @@ int rots[][2][2] =
     }
     return false;
   }
-/*
-  int[][4] matrixMult(int[][2] A, int[][4] B) { //2x2 matrix times 2x4 matrix
-    int[2][4] M;
-    for (int i = 0; i < 8; i++) {
-      M[i/4][i%4] = A[i/4][0]*B[0][i%4] + A[i/4][1]B[1][i%4];
-    }
-    return M;
-  }
-  */
 
 //-------------------------------------------------------------------------------
 
@@ -183,7 +189,7 @@ int rots[][2][2] =
     }
 
     //
-    //GAME LOOP START------------------------------
+    //GAME LOOP START--------------------------------------------------------
     //
     if (t % refresh == 0 && tLast != t) { //Game loop
       setPiece(); //Places piece on board
@@ -194,12 +200,12 @@ int rots[][2][2] =
         return;
       }
       
-      movePiece(t, boundsCheck(0, 2)); //moves piece
+      movePiece(t, 0, 2, rots[2]); //moves piece
 
       printBoard();
     }
     //
-    //GAME LOOP END------------------------------------
+    //GAME LOOP END-------------------------------------------------------------
     //
 
     tLast = t;
