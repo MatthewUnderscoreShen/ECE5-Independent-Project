@@ -7,6 +7,7 @@
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_ILI9341.h"
+#include "Fonts/FreeSans9pt7b.h"
 
 #define TFT_DC 9
 #define TFT_CS 10
@@ -72,7 +73,8 @@ Piece currentPiece;
 
 int rots[][2][2] = 
   { //Rotation matricies
-    { {0, -1},  {1, 0} }, //90deg ccw around origin
+    { {1,  0}, { 0, 1} }, //0 deg
+    { {0, -1}, { 1, 0} }, //90deg ccw around origin
     { {0,  1}, {-1, 0} }  //90deg cw around origin
   };
 
@@ -81,7 +83,7 @@ int rots[][2][2] =
 
   void setPiece() { //this function chooses and sets the piece
     if (activePiece) { return; }
-    pieceNum = 1;
+    pieceNum = 0;
     currentPiece.xOff = pieces[pieceNum].xOff;
     currentPiece.yOff = pieces[pieceNum].yOff;
     currentPiece.xPos = pieces[pieceNum].xPos;
@@ -102,12 +104,14 @@ int rots[][2][2] =
     activePiece = true;
   }
 
-  void movePiece(int currentT, bool isOut) {
-    if ((currentT / refresh % fallSpeed == 0) && currentPiece.yPos < 40) { //Fall
-      currentPiece.yPos = currentPiece.yPos + 2;
+  void movePiece(int currentT, int dx, int dy, int dRot[][2]) {
+    if ((currentT / refresh % fallSpeed == 0) && !boundsCheck(dx, dy, dRot)) { //Fall
+      currentPiece.xPos = currentPiece.xPos + dx;
+      currentPiece.yPos = currentPiece.yPos + dy + 2;
+      matrixMult(dRot, currentPiece.ori, currentPiece.ori);
     }
-
   }
+
 
   bool checkCollision() { //Checks to see if the current block is colliding with a placed block
     for (int i = 0; i < 4; i++) {
@@ -118,44 +122,90 @@ int rots[][2][2] =
     return false;
   }
 
-  void printBoard() {
-    tft.setTextColor(ILI9341_BLACK, 0x3E3C);
+  void printTetris() {
+    tft.setFont(&FreeSans9pt7b);
     tft.setTextSize(1);
-    tft.drawRect(50,24,140,272,ILI9341_BLACK);
-    tft.setCursor(60,32);
+    tft.setTextColor(ILI9341_YELLOW);
+    tft.setCursor(80,25);
+    tft.print("TETRIS");
+  }
+
+  void printBoard() {
+    tft.drawRect(6, 32, 122, 282, ILI9341_BLACK);
     for (int i = 0; i < 40; i = i + 2) {
       for (int j = 0; j < 20; j = j + 2) {
-        tft.print(' ');
         if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][0] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][0] == i) {
-          tft.setTextColor(ILI9341_YELLOW, 0x3E3C);
-          tft.print("1");
+          tft.fillRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_YELLOW);
+          tft.drawRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_BLACK);
         } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][1] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][1] == i) {
-          tft.setTextColor(ILI9341_YELLOW, 0x3E3C);
-          tft.print("1");
+          tft.fillRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_YELLOW);
+          tft.drawRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_BLACK);
         } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][2] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][2] == i) {
-          tft.setTextColor(ILI9341_YELLOW, 0x3E3C);
-          tft.print("1");
+          tft.fillRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_YELLOW);
+          tft.drawRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_BLACK);
         } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][3] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][3] == i) {
-          tft.setTextColor(ILI9341_YELLOW, 0x3E3C);
-          tft.print("1");
+          tft.fillRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_YELLOW);
+          tft.drawRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_BLACK);
         } else {
-          tft.setTextColor(ILI9341_BLACK, 0x3E3C);
-          tft.print(board[i][j]);
+          tft.fillRect(7 + 6*j, 7*i + 33, 12, 14, 0x3E3C); 
+          tft.drawRect(7 + 6*j, 7*i + 33, 12, 14, ILI9341_BLACK);
         } 
       }
-      tft.print('\n');
-      tft.setCursor(60,7*i + 32);
     }
   } 
 
+  void printNextPiece() {
+    tft.drawRect(146, 32, 82, 62, ILI9341_BLACK);
+    tft.drawRect(146, 32, 82, 11, ILI9341_BLACK);
+    tft.fillRect(147, 33, 80, 9, ILI9341_YELLOW); 
+    tft.setFont();
+    tft.setTextSize(0);
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setCursor(158, 34);
+    tft.print("NEXT PIECE");
+  }
 
-  boolean boundsCheck(int dx, int dy/*, int[][] dRot*/) { //returns true if proposed transformation puts piece out of bounds
+  void printCurrentLevel() {
+    tft.drawRect(146, 122, 82, 62, ILI9341_BLACK);
+    tft.drawRect(146, 122, 82, 11, ILI9341_BLACK);
+    tft.fillRect(147, 123, 80, 9, ILI9341_YELLOW); 
+    tft.setFont();
+    tft.setTextSize(0);
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setCursor(148, 124);
+    tft.print("CURRENT LEVEL");
+  }
+
+  void printScore() {
+    tft.drawRect(146, 212, 82, 62, ILI9341_BLACK);
+    tft.drawRect(146, 212, 82, 11, ILI9341_BLACK);
+    tft.fillRect(147, 213, 80, 9, ILI9341_YELLOW); 
+    tft.setFont();
+    tft.setTextSize(0);
+    tft.setTextColor(ILI9341_BLACK);
+    tft.setCursor(173, 214);
+    tft.print("SCORE");
+  }
+
+  //Matrix A, Matrix B, the matrix to copy to
+  void matrixMult(int A[][2], int B[][4], int C[][4]) { //2x2 matrix times 2x4 matrix
+    int M[2][4];
+    for (int i = 0; i < 8; i++) {
+      M[i/4][i%4] = A[i/4][0]*B[0][i%4] + A[i/4][1]*B[1][i%4];
+    }
+    for (int i = 0; i < 8; i++) {
+      C[i/4][i%4] = M[i/4][i%4];
+    }
+  }
+
+  boolean boundsCheck(int dx, int dy, int dRot[][2]) { //returns true if proposed transformation puts piece out of bounds
     int xNew;
     int yNew;
-    //int[][] oriNew = matrixMult(dRot, currentPiece.ori);
+    int oriNew[2][4];
+    matrixMult(dRot, currentPiece.ori, oriNew);
     for (int i = 0; i < 4; i++) {
-      xNew = currentPiece.xPos + dx + currentPiece.xOff + currentPiece.ori[0][i]; //oriNew[0][i];
-      yNew = currentPiece.yPos + dy + currentPiece.yOff + currentPiece.ori[1][i]; //oriNew[1][i];
+      xNew = currentPiece.xPos + dx + currentPiece.xOff + oriNew[0][i];
+      yNew = currentPiece.yPos + dy + currentPiece.yOff + oriNew[1][i];
       if (xNew < 0 || xNew > 40) {
         return true;
       }
@@ -165,15 +215,7 @@ int rots[][2][2] =
     }
     return false;
   }
-/*
-  int[][4] matrixMult(int[][2] A, int[][4] B) { //2x2 matrix times 2x4 matrix
-    int[2][4] M;
-    for (int i = 0; i < 8; i++) {
-      M[i/4][i%4] = A[i/4][0]*B[0][i%4] + A[i/4][1]B[1][i%4];
-    }
-    return M;
-  }
-  */
+
 
 //-------------------------------------------------------------------------------
   
@@ -233,9 +275,13 @@ int rots[][2][2] =
         return;
       }
       
-      movePiece(t, boundsCheck(0, 2)); //moves piece
+      movePiece(t, 0, 2, rots[2]); //moves piece
 
+      printTetris();
       printBoard();
+      printNextPiece();
+      printCurrentLevel();
+      printScore();
     }
     //
     //GAME LOOP END------------------------------------
