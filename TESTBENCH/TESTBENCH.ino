@@ -25,9 +25,10 @@ bool lock; //should the piece be locked?
 int ARE; //entry delay
 int clearDelay = 0;
 bool clearline = false; //clear line?
+int linesCleared;
+int level;
 int linesToClear; //which lines to clear (it's like a string)
 int refresh = 16; //game refresh rate in milliseconds
-int fallSpeed = 48; //How many frames it takes to fall one block
 int bRefresh = 8; //button press refresh rate
 int pieceNum = 0; //piece number
 int nextPiece = 0;
@@ -53,31 +54,31 @@ typedef struct piece Piece;
 //Initializing pieces.
 // 0:I  1:O  2:T  3:J  4:L  5:S  6:Z
 Piece pieces[] = {
-      (Piece){-1, 1, 10, 38, ILI9341_CYAN, 0, {
+      (Piece){1, -1, 8, 36, ILI9341_CYAN, 0, {
                 {-3, -1, 1, 3}, //x
                 { 1,  1, 1, 1}  //y
              }}, //I piece
-      (Piece){1, 1 , 8, 38, ILI9341_YELLOW, 0, { 
+      (Piece){1, 1 , 8, 36, ILI9341_YELLOW, 0, { 
                 {-1, -1,  1, 1},
                 {-1,  1, -1, 1} 
              }}, //O piece
-      (Piece){0, 0, 10, 40, ILI9341_MAGENTA, 0, {
+      (Piece){0, 0, 10, 38, ILI9341_MAGENTA, 0, {
                 {0, -2, 0, 2},
                 {0,  0, -2, 0}
              }}, //T piece
-      (Piece){0, 0, 10, 40, ILI9341_BLUE, 0, {
+      (Piece){0, 0, 10, 38, ILI9341_BLUE, 0, {
                 {0, -2, 2,  2},
                 {0,  0, 0, -2}
              }}, //J piece
-      (Piece){0, 0, 10, 40, ILI9341_ORANGE, 0, {
+      (Piece){0, 0, 10, 38, ILI9341_ORANGE, 0, {
                 {0, -2, -2, 2},
                 {0, -2,  0, 0}
              }}, //L piece
-      (Piece){0, 0, 10, 40, ILI9341_GREENYELLOW, 0, {
+      (Piece){0, 0, 10, 38, ILI9341_GREENYELLOW, 0, {
                 {0, -2,  0, 2},
                 {0, -2, -2, 0}
              }}, //S piece
-      (Piece){0, 0, 10, 40, ILI9341_RED, 0, {
+      (Piece){0, 0, 10, 38, ILI9341_RED, 0, {
                 {0, -2,  0,  2},
                 {0,  0, -2, -2}
              }}  //Z piece
@@ -128,13 +129,17 @@ int rots[][2][2] =
 
   void printNext() {
     for (int i = 0; i < 4; i++) {
-      lcd.fillRect(121 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
-                   68 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
+      lcd.fillRect(128 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
+                   55 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
                    12, 14, pieces[nextPiece].color);
-      lcd.drawRect(121 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
-                   68 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
+      lcd.drawRect(128 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
+                   55 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
                    12, 14, ILI9341_LIGHTGREY);
     }
+  }
+
+  void clearNext() {
+    lcd.fillRect(147, 44, 80, 48, ILI9341_BLACK);
   }
 
   int choosePiece() {
@@ -162,11 +167,13 @@ int rots[][2][2] =
     }
 
     activePiece = true;
+    printPiece(currentPiece.color);
+    clearNext();
     printNext();
   }
 
   void movePiece(int dx, int dy, int dRot) {
-    if (dx == 0 && ((t/refresh-currentPiece.startFrame)%(fallSpeed/dy) != 0) && dRot == 1) {
+    if (dx == 0 && ((t/refresh-currentPiece.startFrame)%(getGravity()/dy) != 0) && dRot == 1) {
       DASCounter = DASCounter + 1;
       return;
     }
@@ -181,7 +188,6 @@ int rots[][2][2] =
       printPiece(ILI9341_BLACK);
       currentPiece.xPos = currentPiece.xPos + dx;
       matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
-      lock = true;
       printPiece(currentPiece.color);
     } else if (boundsCheck(0, dy, rots[dRot])) { //horizontal fail
       printPiece(ILI9341_BLACK);
@@ -189,7 +195,7 @@ int rots[][2][2] =
       matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       printPiece(currentPiece.color);
       DASCounter = DASCounter + 1;
-    } else if (boundsCheck(0, 0, rots[dRot]){ //only rotation
+    } else if (boundsCheck(0, 0, rots[dRot])){ //only rotation
       printPiece(ILI9341_BLACK);
       matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       printPiece(currentPiece.color);
@@ -200,8 +206,11 @@ int rots[][2][2] =
   }
 
   void checkLock() {
-    if (lock) {
+    if (!boundsCheck(0, -2, rots[1])) {
       for (int i = 0; i < 4; i++) {
+        Serial.print(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]);
+        Serial.print("\t");
+        Serial.println(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]);
         board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]] = currentPiece.color;
       }
       activePiece = false;
@@ -210,18 +219,23 @@ int rots[][2][2] =
   }
 
   void checkLineClear() {
-    if (lock) {
-      for (int i = 0; i < 40; i = i + 2) {
-        for (int j = 0; j < 20; j = j + 2) {
-          
-        }
+    for (int i = 38; i >= 0; i = i - 2) {
+      for (int j = 0; i < 20; j = j + 2) {
+        
       }
     }
   }
 
   bool checkCollision() { //Checks to see if the current block is colliding with a placed block
     for (int i = 0; i < 4; i++) {
-      if (board[ currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i] ][ currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i] ] > 0) {
+      /*
+      Serial.print(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]);
+      Serial.print("\t");
+      Serial.print(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]);
+      Serial.print("\t");
+      Serial.println(board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]]);
+      */
+      if (board[ currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i] ][ currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i] ] != 0x0000) {
         return true;
       }
     }
@@ -239,7 +253,7 @@ int rots[][2][2] =
     }
   }
 
-  int boundsCheck(int dx, int dy, int dRot[][2]) {
+  int boundsCheck(int dx, int dy, int dRot[][2]) { //returns true if in bounds, false if out
     int xNew;
     int yNew;
     int oriNew[2][4];
@@ -248,15 +262,19 @@ int rots[][2][2] =
       xNew = currentPiece.xPos + dx + currentPiece.xOff + oriNew[0][i];
       yNew = currentPiece.yPos + dy + currentPiece.yOff + oriNew[1][i];
       if (xNew < 0 || xNew > 18) { return false; }
-      if (yNew < 0 || yNew > 40) { return false; }
-      if (board[xNew][yNew] != 0) { return false; }
+      if (yNew < 0 || yNew > 38) { return false; }
+      if (board[xNew][yNew] != 0x0000) { return false; }
     }
     return true;
   }
 
   int getdx(double x) {
+    if (DASCounter > 30) {
+      DAS = false;
+      DASCounter = 0;
+    }
     if (DAS == 0) { //if DAS == 0, then the piece can move
-      DAS = isDAS ? 6 : 16; //if das occured, 6 frame delay. otherwise, 16 frame delay
+      DAS = isDAS ? 6 : 60; //if das occured, 6 frame delay. otherwise, 16 frame delay
       DAS = true; //das has now occurred
       return (x < 450) ? 2 : ( (x > 1000) ? -2 : 0 );
     }
@@ -265,7 +283,19 @@ int rots[][2][2] =
 
 //GRAVITY IS FINISHED
   int getdy(double y) {
-    return (t/refresh-currentPiece.startFrame)%(fallSpeed/(y > 1000 ? 2 : 1)) == 0 ? -2 : 0
+    return (t/refresh-currentPiece.startFrame)%(getGravity()/(y > 1000 ? 2 : 1)) == 0 ? -2 : 0;
+  }
+
+  int getGravity() { //returns the number of frames it will take to fall one space
+    if (level < 9) {
+      return 48 - level * 5;
+    } else if (level >= 9 && level < 19) {
+      return 6 - (level-7)/3;
+    } else if (level >= 19 && level < 29) {
+      return 2;
+    } else {
+      return 1;
+    }
   }
 
 //ROTATION IS FINISHED
@@ -308,6 +338,8 @@ int rots[][2][2] =
     initPrint();
 
     nextPiece = random(6);
+    linesCleared = 0;
+    level = 0;
 
     ARE = 10;
     DAS = 0;
