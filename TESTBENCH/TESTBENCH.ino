@@ -16,7 +16,7 @@ Adafruit_ILI9341 lcd = Adafruit_ILI9341(LCD_CS, LCD_DC);
 int x, y; //joystick inputs
 int a, b, aLast, bLast; //button inputs
 int aDelay, bDelay; //frame delay after pressing a button
-int buttonDelay = 5;
+int buttonDelay = 3;
 bool aPress, bPress; //is a or b pressed?
 int DASFrame; //start frame for das
 bool DAS; //has das delay happened yet?
@@ -25,8 +25,8 @@ int ARE; //entry delay
 int clearDelay = 0;
 bool clearline = false; //clear line?
 int linesToClear; //which lines to clear (it's like a string)
-int refresh = 250; //game refresh rate in milliseconds
-int fallSpeed = 4; //How many frames it takes to fall one block
+int refresh = 16; //game refresh rate in milliseconds
+int fallSpeed = 48; //How many frames it takes to fall one block
 int bRefresh = 8; //button press refresh rate
 int pieceNum = 0; //piece number
 int lastPiece = 7;
@@ -42,6 +42,7 @@ struct piece {
   int yOff; //to shift it to the board
   int xPos; //location
   int yPos;
+  int color; //color
   int startFrame; //frame where piece was entered
   int ori[2][4]; //piece matrix
 };
@@ -50,31 +51,31 @@ typedef struct piece Piece;
 //Initializing pieces.
 // 0:I  1:O  2:T  3:J  4:L  5:S  6:Z
 Piece pieces[] = {
-      (Piece){-1, 1, 10, 38, 0, {
+      (Piece){-1, 1, 10, 38, ILI9341_CYAN, 0, {
                 {-3, -1, 1, 3}, //x
                 { 1,  1, 1, 1}  //y
              }}, //I piece
-      (Piece){1, 1 , 8, 36, 0, { 
+      (Piece){1, 1 , 8, 36, ILI9341_YELLOW, 0, { 
                 {-1, -1,  1, 1},
                 {-1,  1, -1, 1} 
              }}, //O piece
-      (Piece){0, 0, 8, 36, 0, {
+      (Piece){0, 0, 8, 36, ILI9341_MAGENTA, 0, {
                 {0, -2, 0, 2},
                 {0,  0, 2, 0}
              }}, //T piece
-      (Piece){0, 0, 8, 36, 0, {
+      (Piece){0, 0, 8, 36, ILI9341_BLUE, 0, {
                 {0, -2, -2, 2},
                 {0,  2,  0, 0}
              }}, //J piece
-      (Piece){0, 0, 8, 36, 0, {
+      (Piece){0, 0, 8, 36, ILI9341_ORANGE, 0, {
                 {0, -2, 2, 2},
                 {0,  0, 0, 2}
              }}, //L piece
-      (Piece){0, -1, 8, 36, 0, {
+      (Piece){0, -1, 8, 36, ILI9341_GREENYELLOW, 0, {
                 {-2,    0,   0,   2},
                 {-0.5, -0.5, 0.5, 0.5}
              }}, //S piece
-      (Piece){0, -1, 8, 36, 0, {
+      (Piece){0, -1, 8, 36, ILI9341_RED, 0, {
                 {-2,   0,    0,    2},
                 { 0.5, 0.5, -0.5, -0.5}
              }}  //Z piece
@@ -89,6 +90,26 @@ int rots[][2][2] =
     { {0,  1}, {-1, 0} }  //90deg cw
   };
 
+  void printBoard() {
+    lcd.drawRect(6, 32, 122, 282, ILI9341_LIGHTGREY);
+    for (int i = 38; i >= 0; i = i - 2) {
+      for (int j = 0; j < 20; j = j + 2) {
+        lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, board[i][j]); 
+        lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_LIGHTGREY);
+      }
+    }
+  }
+
+  void printPiece(int c) {
+    for (int i = 0; i < 4; i++) {
+      lcd.fillRect(7 + 6*(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]), 
+                   7*(38-(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i])) + 33,
+                   12, 14, c);
+      lcd.drawRect(7 + 6*(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]), 
+                   7*(38-(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i])) + 33,
+                   12, 14, ILI9341_LIGHTGREY);
+    }
+  }
 
   int choosePiece() {
     int r = random(7);
@@ -102,6 +123,7 @@ int rots[][2][2] =
     currentPiece.yOff = pieces[pieceNum].yOff;
     currentPiece.xPos = pieces[pieceNum].xPos;
     currentPiece.yPos = pieces[pieceNum].yPos;
+    currentPiece.color = pieces[pieceNum].color;
     for (int i = 0; i < 8; i++) {
       currentPiece.ori[i/4][i%4] = pieces[pieceNum].ori[i/4][i%4];
     }
@@ -117,19 +139,29 @@ int rots[][2][2] =
     lastPiece = pieceNum;
   }
 
-  void movePiece(int dx, int dy, int dRot[][2]) {
-    if (boundsCheck(dx, dy, dRot)) { //both directions pass
+  void movePiece(int dx, int dy, int dRot) {
+    if (dx == 0 && ((t/refresh-currentPiece.startFrame)%(fallSpeed/dy) != 0) && dRot == 1) {
+      return;
+    }
+    
+    if (boundsCheck(dx, dy, rots[dRot])) { //both directions pass
+      printPiece(ILI9341_BLACK);
       currentPiece.xPos = currentPiece.xPos + dx;
       currentPiece.yPos = currentPiece.yPos + ((t/refresh-currentPiece.startFrame)%(fallSpeed/dy) == 0 ? -2 : 0);
-      matrixMult(dRot, currentPiece.ori, currentPiece.ori);
-    } else if (boundsCheck(dx, 0, dRot)){ //vertical fail
+      matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
+      printPiece(currentPiece.color);
+    } else if (boundsCheck(dx, 0, rots[dRot])){ //vertical fail
+      printPiece(ILI9341_BLACK);
       currentPiece.xPos = currentPiece.xPos + dx;
-      matrixMult(dRot, currentPiece.ori, currentPiece.ori);
+      matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       lock = true;
-    } else if (boundsCheck(0, dy, dRot)) { //horizontal fail
+      printPiece(currentPiece.color);
+    } else if (boundsCheck(0, dy, rots[dRot])) { //horizontal fail
+      printPiece(ILI9341_BLACK);
       currentPiece.yPos = currentPiece.yPos + (t/refresh%(fallSpeed/dy) == 0 ? -2 : 0);
-      matrixMult(dRot, currentPiece.ori, currentPiece.ori);
+      matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       //DAS
+      printPiece(currentPiece.color);
     } else { //both directions fail
       return;
     }
@@ -138,7 +170,7 @@ int rots[][2][2] =
   void checkLock() {
     if (lock) {
       for (int i = 0; i < 4; i++) {
-        board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]] = 1;
+        board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]] = currentPiece.color;
       }
       activePiece = false;
       //ARE = 10 + ((currentPiece.yPos + 2)/4)*2
@@ -157,60 +189,13 @@ int rots[][2][2] =
 
   bool checkCollision() { //Checks to see if the current block is colliding with a placed block
     for (int i = 0; i < 4; i++) {
-      if (board[ currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i] ][ currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i] ] == 1) {
+      if (board[ currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i] ][ currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i] ] > 0) {
         return true;
       }
     }
     return false;
   }
 
-  void printBoard() {
-    lcd.drawRect(6, 32, 122, 282, ILI9341_BLACK);
-    for (int i = 38; i >= 0; i = i - 2) {
-      for (int j = 0; j < 20; j = j + 2) {
-        if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][0] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][0] == i) {
-          lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_YELLOW);
-          lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][1] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][1] == i) {
-          lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_YELLOW);
-          lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][2] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][2] == i) {
-          lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_YELLOW);
-          lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][3] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][3] == i) {
-          lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_YELLOW);
-          lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
-        } else {
-          lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, 0x3E3C); 
-          lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
-        } 
-      }
-    }
-  } 
-/*
-  void printBoard() {
-    Serial.println("------------------------------");
-    for (int i = 38; i >=  0; i = i - 2) {
-      for (int j = 0; j < 20; j = j + 2) {
-        Serial.print(" ");
-        if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][0] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][0] == i) {
-          Serial.print("1");
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][1] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][1] == i) {
-          Serial.print("1");
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][2] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][2] == i) {
-          Serial.print("1");
-        } else if (currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][3] == j && currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][3] == i) {
-          Serial.print("1");
-        } else {
-          Serial.print(board[i][j]);
-        }
-        Serial.print(" ");
-      }
-      Serial.println("");
-    }
-    Serial.println("------------------------------");
-  }
-*/
   //Matrix A, Matrix B, the matrix to copy to
   void matrixMult(int A[][2], int B[][4], int C[][4]) { //2x2 matrix times 2x4 matrix
     int M[2][4];
@@ -232,7 +217,7 @@ int rots[][2][2] =
       yNew = currentPiece.yPos + (t/refresh%(fallSpeed/dy) == 0 ? -2 : 0) + currentPiece.yOff + oriNew[1][i];
       if (xNew < 0 || xNew > 18) { return false; }
       if (yNew < 0 || yNew > 40) { return false; }
-      if (currentPiece.ori[xNew][yNew] == 1) { return false; }
+      if (board[xNew][yNew] != 0) { return false; }
     }
     return true;
   }
@@ -251,24 +236,24 @@ int rots[][2][2] =
     return y > 1000 ? 2 : 1;   
   }
 
-  int getdRots(int aIn, int, alIn, int bIn, int blIn) {
+  int getdRots(int aIn, int alIn, int bIn, int blIn) {
     int rot = 1;
-    if (aIn == 1 && alIn == 0) {
+    if (aIn > 0 && alIn == 0) {
       if (aDelay == 0) {
         aDelay = buttonDelay;
         rot = rot + 1;
-      } else {
-        aDelay = aDelay - 1;
+        Serial.println("cw");
       }
     }
-    if (bIn == 1 && blIn == 0) {
+    if (bIn > 0 && blIn == 0) {
       if (bDelay == 0) {
         bDelay = buttonDelay;
         rot = rot - 1;
-      } else {
-        bDelay = bDelay - 1;
+        Serial.println("ccw");
       }
     }
+    aDelay = (aDelay == 0) ? 0 : aDelay - 1;
+    bDelay = (bDelay == 0) ? 0 : bDelay - 1;
     return rot;
   }
 
@@ -283,10 +268,11 @@ int rots[][2][2] =
     pinMode(buttonA, INPUT);
     pinMode(buttonB, INPUT);
     for (int i = 0; i < 800; i++) { //initalizes the board
-      board[i / 20][i % 20] = 0;
+      board[i / 20][i % 20] = 0x0000;
     }
 
-    lcd.fillScreen(0x3E3C);
+    lcd.fillScreen(ILI9341_BLACK);
+    printBoard();
 
     ARE = 10;
     aDelay = 0;
@@ -294,17 +280,12 @@ int rots[][2][2] =
 
     aLast = 0;
     bLast = 0;
-    tLast = 0;    
+    tLast = 0;
   }
 
   void loop() {
     // put your main code here, to run repeatedly:
     t = millis();
-
-    x = analogRead(joyX);
-    y = analogRead(joyY);
-    a = digitalRead(buttonA);
-    b = digitalRead(buttonB);
     
     //
     //GAME LOOP START--------------------------------------------------------
@@ -313,8 +294,8 @@ int rots[][2][2] =
 
       x = analogRead(joyX);
       y = analogRead(joyY);
-      a = digitalRead(buttonA);
-      b = digitalRead(buttonB);
+      a = a + digitalRead(buttonA);
+      b = b + digitalRead(buttonB);
 
       //Check if game is active
       if (gameState == false) {
@@ -329,17 +310,21 @@ int rots[][2][2] =
       setPiece(); //Places piece on board
 
       if (!activePiece) { return; }
+
+      //printPiece(ILI9341_BLACK);
       
-      movePiece(getdx(x), getdy(y), rots[getdRot(a, aLast, b, bLast)]); //moves piece
+      movePiece(getdx(x), getdy(y), getdRots(a, aLast, b, bLast)); //moves piece
 
       checkLock();
 
       //checkLine();
 
-      printBoard();
+      //printPiece(currentPiece.color);
 
       aLast = a;
       bLast = b;
+      a = 0;
+      b = 0;
     }
     //
     //GAME LOOP END-------------------------------------------------------------
