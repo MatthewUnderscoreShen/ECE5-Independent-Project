@@ -23,11 +23,10 @@ bool isDAS; //Has DAS happened yet?
 int DASCounter; //DAS reset counter
 bool lock; //should the piece be locked?
 int ARE; //entry delay
-int clearDelay = 0;
-bool clearline = false; //clear line?
-int linesCleared;
-int level;
-int linesToClear; //which lines to clear (it's like a string)
+int clearDelay;
+bool needsClear; //Are there completed lines?
+int linesCleared[20];
+int lines, concurrentLines, score;
 int refresh = 16; //game refresh rate in milliseconds
 int bRefresh = 8; //button press refresh rate
 int pieceNum = 0; //piece number
@@ -37,6 +36,7 @@ long t = 0;
 long tLast = 0;
 bool gameState = true;
 bool activePiece = false;
+const int outlineColor = ILI9341_DARKGREY;
 
 int board[40][20];
 
@@ -54,9 +54,9 @@ typedef struct piece Piece;
 //Initializing pieces.
 // 0:I  1:O  2:T  3:J  4:L  5:S  6:Z
 Piece pieces[] = {
-      (Piece){1, -1, 8, 36, ILI9341_CYAN, 0, {
+      (Piece){1, 1, 8, 38, ILI9341_CYAN, 0, {
                 {-3, -1, 1, 3}, //x
-                { 1,  1, 1, 1}  //y
+                { -1,  -1, -1, -1}  //y
              }}, //I piece
       (Piece){1, 1 , 8, 36, ILI9341_YELLOW, 0, { 
                 {-1, -1,  1, 1},
@@ -94,24 +94,46 @@ int rots[][2][2] =
   };
 
   void initPrint() {
-    //lcd.fillRect(7, 5, 120, 28, ILI9341_LIGHTGREY); //lazy box
+    lcd.setFont(&FreeSans9pt7b);
+    lcd.setTextSize(1);
+    lcd.setTextColor(ILI9341_YELLOW);
+    lcd.setCursor(80,25);
+    lcd.print("TETRIS");
     
-    lcd.drawRect(146, 32, 82, 62, ILI9341_LIGHTGREY);
-    lcd.drawRect(146, 32, 82, 11, ILI9341_LIGHTGREY);
+    lcd.drawRect(146, 32, 82, 62, outlineColor);
+    lcd.drawRect(146, 32, 82, 11, outlineColor);
     lcd.fillRect(147, 33, 80, 9, ILI9341_YELLOW); 
     lcd.setFont();
     lcd.setTextSize(0);
     lcd.setTextColor(ILI9341_BLACK);
     lcd.setCursor(176, 34);
     lcd.print("NEXT");
+
+    lcd.drawRect(146, 212, 82, 62, outlineColor);
+    lcd.drawRect(146, 212, 82, 11, outlineColor);
+    lcd.fillRect(147, 213, 80, 9, ILI9341_YELLOW); 
+    lcd.setFont();
+    lcd.setTextSize(0);
+    lcd.setTextColor(ILI9341_BLACK);
+    lcd.setCursor(173, 214);
+    lcd.print("SCORE");
+
+    lcd.drawRect(146, 122, 82, 62, outlineColor);
+    lcd.drawRect(146, 122, 82, 11, outlineColor);
+    lcd.fillRect(147, 123, 80, 9, ILI9341_YELLOW); 
+    lcd.setFont();
+    lcd.setTextSize(0);
+    lcd.setTextColor(ILI9341_BLACK);
+    lcd.setCursor(148, 124);
+    lcd.print("CURRENT LEVEL");
   }
 
   void printBoard() {
-    lcd.drawRect(6, 32, 122, 282, ILI9341_LIGHTGREY);
+    lcd.drawRect(6, 32, 122, 282, outlineColor);
     for (int i = 38; i >= 0; i = i - 2) {
       for (int j = 0; j < 20; j = j + 2) {
-        lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, board[i][j]); 
-        lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, ILI9341_LIGHTGREY);
+        lcd.fillRect(7 + 6*j, 7*(38-i) + 33, 12, 14, board[j][i]); 
+        lcd.drawRect(7 + 6*j, 7*(38-i) + 33, 12, 14, outlineColor);
       }
     }
   }
@@ -123,23 +145,56 @@ int rots[][2][2] =
                    12, 14, c);
       lcd.drawRect(7 + 6*(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]), 
                    7*(38-(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i])) + 33,
-                   12, 14, ILI9341_LIGHTGREY);
+                   12, 14, outlineColor);
     }
   }
 
   void printNext() {
     for (int i = 0; i < 4; i++) {
-      lcd.fillRect(128 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
+      lcd.fillRect(123 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
                    55 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
                    12, 14, pieces[nextPiece].color);
-      lcd.drawRect(128 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
+      lcd.drawRect(123 + 6*(pieces[nextPiece].xPos + pieces[nextPiece].xOff + pieces[nextPiece].ori[0][i]), 
                    55 + 7*(38-(pieces[nextPiece].yPos + pieces[nextPiece].yOff + pieces[nextPiece].ori[1][i])),
-                   12, 14, ILI9341_LIGHTGREY);
+                   12, 14, outlineColor);
     }
   }
 
   void clearNext() {
     lcd.fillRect(147, 44, 80, 48, ILI9341_BLACK);
+  }
+
+  void clearLines(int c) {
+    for (int i = 38; i >= 0; i = i - 2) {
+      if (linesCleared[i/2] == 10) {
+        lcd.fillRect(7 + 6*(c/4 - 2)*2, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
+        lcd.drawRect(7 + 6*(c/4 - 2)*2, 7*(38-i) + 33, 12, 14, outlineColor);
+        lcd.fillRect(7 + 6*(11 - c/4)*2, 7*(38-i) + 33, 12, 14, ILI9341_BLACK);
+        lcd.drawRect(7 + 6*(11 - c/4)*2, 7*(38-i) + 33, 12, 14, outlineColor);
+      }
+    }
+  }
+
+  int getLevel() {
+    return lines/10;
+  }
+
+  void printScore() {
+    lcd.fillRect(150, 225, 70, 40, ILI9341_BLACK);
+    lcd.setFont();
+    lcd.setTextSize(2);
+    lcd.setTextColor(ILI9341_WHITE);
+    lcd.setCursor(162, 241);
+    lcd.print(score);
+  }
+
+  void printLevel() {
+    lcd.fillRect(150, 132, 70, 40, ILI9341_BLACK);
+    lcd.setFont();
+    lcd.setTextSize(2);
+    lcd.setTextColor(ILI9341_WHITE);
+    lcd.setCursor(176, 150);
+    lcd.print(getLevel());
   }
 
   int choosePiece() {
@@ -161,6 +216,13 @@ int rots[][2][2] =
     currentPiece.startFrame = t/refresh;
 
     if (checkCollision()) {
+      printPiece(currentPiece.color);
+      lcd.fillRect(8, 130, 118, 58, ILI9341_BLACK);
+      lcd.setFont(&FreeSans9pt7b);
+      lcd.setTextSize(1);
+      lcd.setTextColor(ILI9341_YELLOW);
+      lcd.setCursor(14, 164);
+      lcd.print("GAME OVER");
       Serial.println("Game Over");
       gameState = false;
       return;
@@ -173,7 +235,7 @@ int rots[][2][2] =
   }
 
   void movePiece(int dx, int dy, int dRot) {
-    if (dx == 0 && ((t/refresh-currentPiece.startFrame)%(getGravity()/dy) != 0) && dRot == 1) {
+    if (dx == 0 && dy == 0 && dRot == 1) {
       DASCounter = DASCounter + 1;
       return;
     }
@@ -184,11 +246,13 @@ int rots[][2][2] =
       currentPiece.yPos = currentPiece.yPos + dy;
       matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       printPiece(currentPiece.color);
+      DASCounter = 0;
     } else if (boundsCheck(dx, 0, rots[dRot])){ //vertical fail
       printPiece(ILI9341_BLACK);
       currentPiece.xPos = currentPiece.xPos + dx;
       matrixMult(rots[dRot], currentPiece.ori, currentPiece.ori);
       printPiece(currentPiece.color);
+      DASCounter = 0;
     } else if (boundsCheck(0, dy, rots[dRot])) { //horizontal fail
       printPiece(ILI9341_BLACK);
       currentPiece.yPos = currentPiece.yPos + dy;
@@ -203,38 +267,56 @@ int rots[][2][2] =
     } else { //total failure
       return;
     }
+    //Serial.println("Piece Moved");
+  }
+
+  void dropLines() {
+    for (int l = 38; l >= 0; l = l - 2) {
+      Serial.print("::");
+      Serial.println(linesCleared[l/2]);
+      if (linesCleared[l/2] == 10) { //clearing the line and dropping the pieces down
+        concurrentLines++;
+        for (int i = l; i < 40; i = i + 2) {
+          for (int j = 0; j < 20; j = j + 2) {
+            if (i == 38) { board[j][i] = 0x0000; }
+            else { board[j][i] = board[j][i + 2]; }
+          }
+        }
+      }
+    }
+    lines += concurrentLines;
+    if      (concurrentLines == 1) { score += 40   * (getLevel() + 1); }
+    else if (concurrentLines == 2) { score += 100  * (getLevel() + 1); }
+    else if (concurrentLines == 3) { score += 300  * (getLevel() + 1); }
+    else if (concurrentLines == 4) { score += 1200 * (getLevel() + 1); }
+    concurrentLines = 0;
+    printScore();
+    printLevel();
   }
 
   void checkLock() {
     if (!boundsCheck(0, -2, rots[1])) {
       for (int i = 0; i < 4; i++) {
-        Serial.print(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]);
-        Serial.print("\t");
-        Serial.println(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]);
         board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]] = currentPiece.color;
       }
       activePiece = false;
-      //ARE = 10 + ((currentPiece.yPos + 2)/4)*2
+      //Serial.println("Piece Locked");
+      ARE = 10 + ((currentPiece.yPos/2 + 2)/4)*2;
     }
   }
 
   void checkLineClear() {
     for (int i = 38; i >= 0; i = i - 2) {
-      for (int j = 0; i < 20; j = j + 2) {
-        
+      for (int j = 0; j < 20; j = j + 2) {
+        linesCleared[i/2] += (board[j][i] != 0x0000) ? 1 : 0;
       }
+      needsClear = needsClear ? true : linesCleared[i/2] == 10;
     }
+    clearDelay = needsClear ? 24 : 0;
   }
 
   bool checkCollision() { //Checks to see if the current block is colliding with a placed block
     for (int i = 0; i < 4; i++) {
-      /*
-      Serial.print(currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]);
-      Serial.print("\t");
-      Serial.print(currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]);
-      Serial.print("\t");
-      Serial.println(board[currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i]][currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i]]);
-      */
       if (board[ currentPiece.xPos + currentPiece.xOff + currentPiece.ori[0][i] ][ currentPiece.yPos + currentPiece.yOff + currentPiece.ori[1][i] ] != 0x0000) {
         return true;
       }
@@ -268,30 +350,31 @@ int rots[][2][2] =
     return true;
   }
 
+//HORIZONTAL IS FINISHED
   int getdx(double x) {
-    if (DASCounter > 30) {
-      DAS = false;
+    if (DASCounter > 60) {
+      isDAS = false;
       DASCounter = 0;
     }
     if (DAS == 0) { //if DAS == 0, then the piece can move
-      DAS = isDAS ? 6 : 60; //if das occured, 6 frame delay. otherwise, 16 frame delay
-      DAS = true; //das has now occurred
-      return (x < 450) ? 2 : ( (x > 1000) ? -2 : 0 );
+      DAS = isDAS ? 6 : 24; //if das occured, 6 frame delay. otherwise, 16 frame delay
+      isDAS = true; //das has now occurred
+      return (x < 400) ? 2 : ( (x > 1020) ? -2 : 0 );
     }
     DAS = DAS - 1;
   }
 
 //GRAVITY IS FINISHED
   int getdy(double y) {
-    return (t/refresh-currentPiece.startFrame)%(getGravity()/(y > 1000 ? 2 : 1)) == 0 ? -2 : 0;
+    return (t/refresh-currentPiece.startFrame)%(getGravity()/(y > 1000 ? getGravity()/4 : 1)) == 0 ? -2 : 0;
   }
 
   int getGravity() { //returns the number of frames it will take to fall one space
-    if (level < 9) {
-      return 48 - level * 5;
-    } else if (level >= 9 && level < 19) {
-      return 6 - (level-7)/3;
-    } else if (level >= 19 && level < 29) {
+    if (getLevel() < 9) {
+      return 48 - getLevel() * 5;
+    } else if (getLevel() >= 9 && getLevel() < 19) {
+      return 6 - (getLevel()-7)/3;
+    } else if (getLevel() >= 19 && getLevel() < 29) {
       return 2;
     } else {
       return 1;
@@ -335,11 +418,15 @@ int rots[][2][2] =
 
     lcd.fillScreen(ILI9341_BLACK);
     printBoard();
+    printScore();
+    printLevel();
     initPrint();
 
     nextPiece = random(6);
-    linesCleared = 0;
-    level = 0;
+    needsClear = false;
+    lines = 0;
+    concurrentLines = 0;
+    score = 0;
 
     ARE = 10;
     DAS = 0;
@@ -347,6 +434,7 @@ int rots[][2][2] =
     DASCounter = 0;
     aDelay = 0;
     bDelay = 0;
+    clearDelay = 0;
 
     aLast = 0;
     bLast = 0;
@@ -376,14 +464,42 @@ int rots[][2][2] =
         tLast = t;
         return;
       }
+      
+      if (ARE != 0) {
+        ARE = ARE - 1;
+        return;
+      }
 
+      //Serial.println(clearDelay);
       if (!activePiece) { 
-        setPiece(); 
+        if (clearDelay == 0) {
+          setPiece();
+        } else if (clearDelay == 4) {
+          dropLines();
+          clearDelay = clearDelay - 1;
+          printBoard();
+          return;
+        } else if (clearDelay%4 == 0) {
+          clearLines(clearDelay);
+          clearDelay = clearDelay - 1;
+          return;
+        } else {
+          clearDelay = clearDelay - 1;
+          return;
+        }
       } 
       else {
         movePiece(getdx(x), getdy(y), getdRots(a, aLast, b, bLast)); //moves piece
         checkLock(); //check if the piece should lock
+        if (!activePiece) {
+          for (int i = 0; i < 20; i++) {
+            linesCleared[i] = 0;
+          }
+          checkLineClear(); //check if lines need to be cleared
+        }
       }
+
+      //Serial.println("heya");
       
       aLast = a;
       bLast = b;
@@ -393,11 +509,5 @@ int rots[][2][2] =
     //
     //GAME LOOP END-------------------------------------------------------------
     //
-
-/*
-    Serial.print(x);
-    Serial.print("\t");
-    Serial.println(y);
-*/
     tLast = t;
   }
